@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id @default(cuid())
+  clerkId          String   @unique
+  email            String   @unique
+  stripeCustomerId String?
+  plan             String   @default("free")
+  usageCount       Int      @default(0)
+  usageResetAt     DateTime @default(now())
+  createdAt        DateTime @default(now())
+}
+
+model Scorecard {
+  id        String   @id @default(cuid())
+  sessionId String?  @unique
+  answers   Json
+  result    Json
+  paid      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
