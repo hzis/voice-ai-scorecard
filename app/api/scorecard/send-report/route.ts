@@ -193,6 +193,6 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("send-report error:", msg);
-    return NextResponse.json({ error: "Failed to send report.", detail: msg }, { status: 500 });
+    return NextResponse.json({ error: "Failed to send report." }, { status: 500 });
   }
 }
