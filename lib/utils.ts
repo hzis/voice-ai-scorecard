@@ -13,5 +13,8 @@ export function formatPrice(price: number) {
 }
 
 export function absoluteUrl(path: string) {
-  return `${process.env.NEXT_PUBLIC_APP_URL}${path}`;
+  // Use NEXT_PUBLIC_APP_URL (available both client and server in Next.js)
+  // Fallback to hardcoded production URL if env var is missing
+  const base = process.env.NEXT_PUBLIC_APP_URL || "https://scorecard.talkra.ai";
+  return `${base}${path}`;
 }
