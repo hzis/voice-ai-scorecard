@@ -70,7 +70,7 @@ export default function LandingPage() {
         {/* Hero */}
         <section className="flex flex-col items-center justify-center gap-6 pb-16 pt-24 text-center md:pb-24 md:pt-32">
           <div className="mx-auto max-w-3xl space-y-4 px-4">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl break-words">
               Is Your Business Ready for an{" "}
               <span className="text-primary">AI Voice Agent</span>?
             </h1>
