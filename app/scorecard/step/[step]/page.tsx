@@ -96,10 +96,10 @@ export default function StepPage() {
                   key={oi}
                   type="button"
                   onClick={() => selectOption(q.id, oi)}
-                  className={`rounded-lg border-2 p-4 text-left text-sm transition-colors min-h-[44px] ${
+                  className={`rounded-lg border-2 p-4 text-left text-sm transition-all min-h-[44px] font-medium ${
                     answers[q.id] === oi
-                      ? "border-primary bg-primary/5 font-medium"
-                      : "border-border hover:border-primary/50"
+                      ? "border-primary bg-primary text-primary-foreground shadow-md"
+                      : "border-border bg-white hover:border-primary/50 hover:bg-muted"
                   }`}
                 >
                   {option}
