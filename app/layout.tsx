@@ -29,10 +29,27 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: siteConfig.name,
   description: siteConfig.description,
+  metadataBase: new URL(siteConfig.url),
   openGraph: {
     title: siteConfig.name,
     description: siteConfig.description,
     url: siteConfig.url,
+    siteName: "Voice AI Scorecard",
+    images: [
+      {
+        url: "/api/og",
+        width: 1200,
+        height: 630,
+        alt: "Voice AI Scorecard — Is your business ready for an AI voice agent?",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteConfig.name,
+    description: siteConfig.description,
+    images: ["/api/og"],
   },
 };
 
@@ -43,7 +60,7 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="en" style={{ colorScheme: "light" }}>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >

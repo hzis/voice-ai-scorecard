@@ -21,14 +21,7 @@ export async function POST(req: NextRequest) {
 
     const result = calculateScore(answers);
 
-    const scorecard = await db.scorecard.create({
-      data: {
-        answers: answers as Prisma.InputJsonValue,
-        result: result as unknown as Prisma.InputJsonValue,
-        paid: false,
-      },
-    });
-
+    // Create Stripe session first (no DB dependency)
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -44,13 +37,19 @@ export async function POST(req: NextRequest) {
       ),
       cancel_url: absoluteUrl("/scorecard/paywall"),
       metadata: {
-        scorecardId: scorecard.id,
+        answers: JSON.stringify(answers),
+        result: JSON.stringify(result),
       },
     });
 
-    await db.scorecard.update({
-      where: { id: scorecard.id },
-      data: { sessionId: session.id },
+    // Single DB write — no prepared statement conflict with pgBouncer
+    await db.scorecard.create({
+      data: {
+        sessionId: session.id,
+        answers: answers as Prisma.InputJsonValue,
+        result: result as unknown as Prisma.InputJsonValue,
+        paid: false,
+      },
     });
 
     return NextResponse.json({ url: session.url });
@@ -58,7 +57,7 @@ export async function POST(req: NextRequest) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("Checkout error:", msg);
     return NextResponse.json(
-      { error: "Failed to create checkout session.", detail: msg },
+      { error: "Failed to create checkout session." },
       { status: 500 }
     );
   }

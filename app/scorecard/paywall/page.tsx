@@ -19,6 +19,7 @@ function getStoredAnswers(): Record<string, number> {
 export default function PaywallPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -33,6 +34,12 @@ export default function PaywallPage() {
 
   async function handleCheckout() {
     setLoading(true);
+    setError(null);
+    // Timeout: show error after 15s if still spinning
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setError("Checkout is taking too long. Please try again.");
+    }, 15000);
     try {
       const answers = getStoredAnswers();
       const res = await fetch("/api/scorecard/checkout", {
@@ -41,10 +48,16 @@ export default function PaywallPage() {
         body: JSON.stringify({ answers }),
       });
       const data = await res.json();
+      clearTimeout(timeout);
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        setError("Unable to start checkout. Please try again.");
+        setLoading(false);
       }
     } catch {
+      clearTimeout(timeout);
+      setError("Network error. Please check your connection and try again.");
       setLoading(false);
     }
   }
@@ -110,6 +123,12 @@ export default function PaywallPage() {
             "Unlock My Score — $19"
           )}
         </Button>
+
+        {error && (
+          <p className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
         <p className="text-xs text-muted-foreground">
           One-time payment. 7-day money-back guarantee.
