@@ -1,7 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { db } from "@/lib/db";
 import type { ScorecardResult } from "@/lib/scoring";
+
+// Send email via Gmail API using stored OAuth credentials
+async function getGmailAccessToken(): Promise<string> {
+  const params = new URLSearchParams({
+    client_id: process.env.GMAIL_CLIENT_ID!,
+    client_secret: process.env.GMAIL_CLIENT_SECRET!,
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN!,
+    grant_type: "refresh_token",
+  });
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+  const data = await res.json() as { access_token?: string; error?: string };
+  if (!data.access_token) throw new Error(`OAuth error: ${data.error}`);
+  return data.access_token;
+}
+
+function buildEmailMime(to: string, subject: string, htmlBody: string): string {
+  const mime = [
+    `From: Talkra AI <talkra.ai@gmail.com>`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/html; charset=UTF-8`,
+    ``,
+    htmlBody,
+  ].join("\r\n");
+  return Buffer.from(mime).toString("base64url");
+}
+
+async function sendGmail(to: string, subject: string, html: string): Promise<void> {
+  const token = await getGmailAccessToken();
+  const raw = buildEmailMime(to, subject, html);
+  const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ raw }),
+  });
+  if (!res.ok) {
+    const err = await res.json() as { error?: { message?: string } };
+    throw new Error(`Gmail API error: ${err?.error?.message ?? res.status}`);
+  }
+}
 
 function generateEmailHtml(result: ScorecardResult, email: string): string {
   const levelColors: Record<string, string> = {
@@ -41,8 +88,8 @@ function generateEmailHtml(result: ScorecardResult, email: string): string {
     .map(
       (rec, i) => `
       <tr>
-        <td style="padding:10px 0;vertical-align:top;">
-          <span style="display:inline-block;background:${color};color:white;border-radius:50%;width:22px;height:22px;line-height:22px;text-align:center;font-size:12px;font-weight:700;margin-right:12px;">${i + 1}</span>
+        <td style="padding:10px 0;vertical-align:top;width:32px;">
+          <span style="display:inline-block;background:${color};color:white;border-radius:50%;width:22px;height:22px;line-height:22px;text-align:center;font-size:12px;font-weight:700;">${i + 1}</span>
         </td>
         <td style="padding:10px 0;font-size:14px;color:#374151;line-height:1.5;">${rec}</td>
       </tr>`
@@ -71,17 +118,11 @@ function generateEmailHtml(result: ScorecardResult, email: string): string {
         <tr>
           <td style="padding:32px;">
 
-            <!-- Category Breakdown -->
             <h2 style="font-size:18px;font-weight:700;color:#111827;margin:0 0 20px;">Category Breakdown</h2>
-            <table width="100%" cellpadding="0" cellspacing="0">
-              ${categoriesHtml}
-            </table>
+            <table width="100%" cellpadding="0" cellspacing="0">${categoriesHtml}</table>
 
-            <!-- Recommendations -->
             <h2 style="font-size:18px;font-weight:700;color:#111827;margin:32px 0 16px;">Top Recommendations</h2>
-            <table width="100%" cellpadding="0" cellspacing="0">
-              ${recsHtml}
-            </table>
+            <table width="100%" cellpadding="0" cellspacing="0">${recsHtml}</table>
 
             <!-- ROI -->
             <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:20px;margin:28px 0;">
@@ -102,7 +143,7 @@ function generateEmailHtml(result: ScorecardResult, email: string): string {
         <tr>
           <td style="background:#f9fafb;padding:24px 32px;border-top:1px solid #e5e7eb;text-align:center;">
             <div style="font-size:13px;color:#9ca3af;">Sent to ${email} · <a href="https://scorecard.talkra.ai" style="color:#6b7280;">scorecard.talkra.ai</a></div>
-            <div style="font-size:12px;color:#9ca3af;margin-top:4px;">© 2026 Talkra.AI · hello@talkra.ai</div>
+            <div style="font-size:12px;color:#9ca3af;margin-top:4px;">© 2026 Talkra.AI · talkra.ai@gmail.com</div>
           </td>
         </tr>
 
@@ -127,33 +168,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "sessionId required." }, { status: 400 });
     }
 
-    // Fetch scorecard
-    const scorecard = await db.scorecard.findUnique({
-      where: { sessionId },
-    });
-
+    const scorecard = await db.scorecard.findUnique({ where: { sessionId } });
     if (!scorecard || !scorecard.paid) {
       return NextResponse.json({ error: "Scorecard not found or not paid." }, { status: 404 });
     }
 
     const result = scorecard.result as unknown as ScorecardResult;
     const html = generateEmailHtml(result, email);
+    const subject = `Your Voice AI Readiness Score: ${result.totalScore}/100 — ${
+      result.level === "champion" ? "🏆 Champion"
+      : result.level === "ready" ? "✅ Ready"
+      : result.level === "exploring" ? "🔍 Exploring"
+      : "🔧 Action Required"
+    }`;
 
-    // Send via Resend (instantiated at request time to avoid build-time key validation)
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const { error: resendError } = await resend.emails.send({
-      from: "Talkra AI <report@talkra.ai>",
-      to: email,
-      subject: `Your Voice AI Scorecard: ${result.totalScore}/100 — ${result.level === "champion" ? "🏆 Champion" : result.level === "ready" ? "✅ Ready" : result.level === "exploring" ? "🔍 Exploring" : "🔧 Not Ready Yet"}`,
-      html,
-    });
+    await sendGmail(email, subject, html);
 
-    if (resendError) {
-      console.error("Resend error:", resendError);
-      return NextResponse.json({ error: "Failed to send email." }, { status: 500 });
-    }
-
-    // Save email to DB
     await db.scorecard.update({
       where: { sessionId },
       data: { email, emailSentAt: new Date() },
