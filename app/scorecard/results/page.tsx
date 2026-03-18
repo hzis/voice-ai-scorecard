@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   CheckCircle2,
-  Download,
+  Mail,
   Phone,
   Loader2,
   TrendingUp,
+  Send,
 } from "lucide-react";
 import type { ScorecardResult, Level } from "@/lib/scoring";
 
@@ -49,6 +50,10 @@ function ResultsContent() {
   const sessionId = searchParams.get("session_id");
   const [result, setResult] = useState<ScorecardResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
@@ -76,6 +81,30 @@ function ResultsContent() {
 
     verify();
   }, [sessionId, router]);
+
+  async function sendReport(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || !email.includes("@") || !sessionId) return;
+    setEmailSending(true);
+    setEmailError(null);
+    try {
+      const res = await fetch("/api/scorecard/send-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, sessionId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setEmailSent(true);
+      } else {
+        setEmailError(data.error || "Failed to send. Try again.");
+      }
+    } catch {
+      setEmailError("Network error. Please try again.");
+    } finally {
+      setEmailSending(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -186,6 +215,54 @@ function ResultsContent() {
         </div>
       </div>
 
+      {/* Email Report */}
+      <div className="mb-8 rounded-xl border bg-muted/20 p-6">
+        <div className="mb-4 flex items-center gap-3">
+          <Mail className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Get Your Full Report</h2>
+        </div>
+        {emailSent ? (
+          <div className="flex items-center gap-3 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+            <p className="text-sm text-green-700 font-medium">
+              Report sent to <strong>{email}</strong> — check your inbox!
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={sendReport} className="flex flex-col gap-3 sm:flex-row">
+            <input
+              type="email"
+              required
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="flex-1 rounded-lg border border-border bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+            <Button type="submit" disabled={emailSending} className="shrink-0">
+              {emailSending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Email me my report
+                </>
+              )}
+            </Button>
+          </form>
+        )}
+        {emailError && (
+          <p className="mt-2 text-sm text-red-600">{emailError}</p>
+        )}
+        {!emailSent && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Includes score, category breakdown, top 5 recommendations + ROI estimate.
+          </p>
+        )}
+      </div>
+
       {/* Actions */}
       <div className="flex flex-col gap-4 sm:flex-row">
         <Button size="lg" className="flex-1" asChild>
@@ -193,10 +270,6 @@ function ResultsContent() {
             <Phone className="mr-2 h-4 w-4" />
             Book a Talkra Demo
           </a>
-        </Button>
-        <Button size="lg" variant="outline" className="flex-1" disabled>
-          <Download className="mr-2 h-4 w-4" />
-          Download PDF (Coming Soon)
         </Button>
       </div>
     </div>

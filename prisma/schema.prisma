@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -19,10 +20,12 @@ model User {
 }
 
 model Scorecard {
-  id        String   @id @default(cuid())
-  sessionId String?  @unique
-  answers   Json
-  result    Json
-  paid      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  sessionId    String?  @unique
+  answers      Json
+  result       Json
+  paid         Boolean  @default(false)
+  email        String?
+  emailSentAt  DateTime?
+  createdAt    DateTime @default(now())
 }
