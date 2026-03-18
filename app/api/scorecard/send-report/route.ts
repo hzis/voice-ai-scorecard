@@ -3,8 +3,6 @@ import { Resend } from "resend";
 import { db } from "@/lib/db";
 import type { ScorecardResult } from "@/lib/scoring";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 function generateEmailHtml(result: ScorecardResult, email: string): string {
   const levelColors: Record<string, string> = {
     "not-ready": "#dc2626",
@@ -141,7 +139,8 @@ export async function POST(req: NextRequest) {
     const result = scorecard.result as unknown as ScorecardResult;
     const html = generateEmailHtml(result, email);
 
-    // Send via Resend
+    // Send via Resend (instantiated at request time to avoid build-time key validation)
+    const resend = new Resend(process.env.RESEND_API_KEY);
     const { error: resendError } = await resend.emails.send({
       from: "Talkra AI <report@talkra.ai>",
       to: email,
